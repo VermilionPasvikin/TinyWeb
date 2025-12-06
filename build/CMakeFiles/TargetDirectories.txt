@@ -1,0 +1,3 @@
+/Users/vermi/个人项目/C/TinyWeb/build/CMakeFiles/TinyWeb.dir
+/Users/vermi/个人项目/C/TinyWeb/build/CMakeFiles/edit_cache.dir
+/Users/vermi/个人项目/C/TinyWeb/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,26 @@
+[
+{
+  "directory": "/Users/vermi/个人项目/C/TinyWeb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc   -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -o CMakeFiles/TinyWeb.dir/csapp.c.o -c /Users/vermi/个人项目/C/TinyWeb/csapp.c",
+  "file": "/Users/vermi/个人项目/C/TinyWeb/csapp.c",
+  "output": "CMakeFiles/TinyWeb.dir/csapp.c.o"
+},
+{
+  "directory": "/Users/vermi/个人项目/C/TinyWeb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc   -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -o CMakeFiles/TinyWeb.dir/main.c.o -c /Users/vermi/个人项目/C/TinyWeb/main.c",
+  "file": "/Users/vermi/个人项目/C/TinyWeb/main.c",
+  "output": "CMakeFiles/TinyWeb.dir/main.c.o"
+},
+{
+  "directory": "/Users/vermi/个人项目/C/TinyWeb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc   -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -o CMakeFiles/TinyWeb.dir/sbuf.c.o -c /Users/vermi/个人项目/C/TinyWeb/sbuf.c",
+  "file": "/Users/vermi/个人项目/C/TinyWeb/sbuf.c",
+  "output": "CMakeFiles/TinyWeb.dir/sbuf.c.o"
+},
+{
+  "directory": "/Users/vermi/个人项目/C/TinyWeb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/cc   -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -o CMakeFiles/TinyWeb.dir/sio.c.o -c /Users/vermi/个人项目/C/TinyWeb/sio.c",
+  "file": "/Users/vermi/个人项目/C/TinyWeb/sio.c",
+  "output": "CMakeFiles/TinyWeb.dir/sio.c.o"
+}
+]

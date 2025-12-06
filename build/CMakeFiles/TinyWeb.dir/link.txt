@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/cc -g -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX15.5.sdk -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/TinyWeb.dir/csapp.c.o CMakeFiles/TinyWeb.dir/main.c.o CMakeFiles/TinyWeb.dir/sbuf.c.o CMakeFiles/TinyWeb.dir/sio.c.o -o TinyWeb
