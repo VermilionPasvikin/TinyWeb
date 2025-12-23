@@ -1,8 +1,8 @@
 #include "csapp.h"
 #include "sio.h"
 #include "sbuf.h"
-#define THREAD_COUNT 4
-#define SBUF_SIZE 16
+#define THREAD_COUNT 8
+#define SBUF_SIZE 32
 
 sbuf_t sbuf;
 #ifdef __APPLE__
@@ -51,7 +51,7 @@ void sigchld_handler(int sig)
 
     while (1)
     {
-        pid = waitpid(-1, NULL, 0);
+        pid = waitpid(-1, NULL, WNOHANG);
         sigprocmask(SIG_BLOCK, &mask, &prev_mask);
         if (pid > 0)
         {
@@ -212,6 +212,11 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 {
     char *ptr;
 
+    // 检查是否包含目录遍历序列
+    if (strstr(uri, "..") != NULL) {
+        return -1; // 拒绝请求
+    }
+
     if (!strstr(uri, "cgi-bin")) { 
         strcpy(cgiargs, "");
         strcpy(filename, ".");
@@ -248,10 +253,17 @@ void serve_static(int fd, char *filename, int filesize)
     Rio_writen(fd, buf, strlen(buf));
 
     srcfd = Open(filename, O_RDONLY, 0);
-    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+    if (filesize < 1024 * 1024) { // 小文件使用直接read
+        char *filebuf = (char *)Malloc(filesize);
+        Read(srcfd, filebuf, filesize);
+        Rio_writen(fd, filebuf, filesize);
+        Free(filebuf);
+    } else { // 大文件使用mmap
+        srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+        Rio_writen(fd, srcp, filesize);
+        Munmap(srcp, filesize);
+    }
     Close(srcfd);
-    Rio_writen(fd, srcp, filesize);
-    Munmap(srcp, filesize);
 }
 
 void get_filetype(char *filename, char *filetype) 
