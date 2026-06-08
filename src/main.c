@@ -1,10 +1,12 @@
 #include "csapp.h"
 #include "sio.h"
 #include "sbuf.h"
+#include <libgen.h>   /* dirname() */
 #define THREAD_COUNT 8
 #define SBUF_SIZE 32
 
 sbuf_t sbuf;
+char g_root[MAXLINE]; /* 站点根目录，默认为 ./www */
 #ifdef __APPLE__
 sem_t *terminal_mutex;
 #else
@@ -88,6 +90,30 @@ int main(int argc, char **argv)
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
 
+    /* 自动切换到可执行文件所在目录，保证 www/ 相对路径始终有效 */
+#ifdef __APPLE__
+    {
+        char exe_path[MAXLINE];
+        uint32_t size = sizeof(exe_path);
+        if (_NSGetExecutablePath(exe_path, &size) == 0) {
+            char *dir = dirname(exe_path);
+            if (chdir(dir) != 0)
+                perror("chdir to exe directory failed");
+        }
+    }
+#else
+    {
+        char exe_path[MAXLINE];
+        ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+        if (len > 0) {
+            exe_path[len] = '\0';
+            char *dir = dirname(exe_path);
+            if (chdir(dir) != 0)
+                perror("chdir to exe directory failed");
+        }
+    }
+#endif
+
     Signal(SIGCHLD, sigchld_handler);
     Signal(SIGPIPE, sigpipe_handler);
     Signal(SIGINT, sigterm_handler);  /* 捕获Ctrl+C信号 */
@@ -99,8 +125,9 @@ int main(int argc, char **argv)
     Sem_init(&terminal_mutex, 0, 1);
 #endif
 
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+    /* 解析命令行参数：TinyWeb <port> [--root <dir>] */
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s <port> [--root <dir>]\n", argv[0]);
         exit(1);
     }
 
@@ -108,6 +135,22 @@ int main(int argc, char **argv)
         fprintf(stderr, "invalid port\n");
         exit(1);
     }
+
+    /* 解析 --root 参数，默认使用可执行文件所在目录下的 www/ */
+    strcpy(g_root, "www");
+    for (int i = 2; i < argc - 1; i++) {
+        if (strcmp(argv[i], "--root") == 0) {
+            strncpy(g_root, argv[i+1], MAXLINE - 1);
+            g_root[MAXLINE - 1] = '\0';
+            /* 去掉末尾斜杠 */
+            int rlen = strlen(g_root);
+            if (rlen > 1 && g_root[rlen-1] == '/')
+                g_root[rlen-1] = '\0';
+            break;
+        }
+    }
+
+    printf("TinyWeb starting on port %d, serving from: %s\n", port_t, g_root);
 
     listenfd = Open_listenfd(port_t);
 
@@ -217,15 +260,15 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         return -1; // 拒绝请求
     }
 
-    if (!strstr(uri, "cgi-bin")) { 
+    if (!strstr(uri, "cgi-bin")) {
         strcpy(cgiargs, "");
-        strcpy(filename, ".");
+        strcpy(filename, g_root);
         strcat(filename, uri);
-        if (uri[strlen(uri)-1] == '/') 
+        if (uri[strlen(uri)-1] == '/')
             strcat(filename, "index.html");
         return 1;
     }
-    else { 
+    else {
         ptr = index(uri, '?');
         if (ptr) {
             strcpy(cgiargs, ptr+1);
@@ -233,7 +276,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         }
         else
             strcpy(cgiargs, "");
-        strcpy(filename, ".");
+        strcpy(filename, g_root);
         strcat(filename, uri);
         return 0;
     }
@@ -266,20 +309,50 @@ void serve_static(int fd, char *filename, int filesize)
     Close(srcfd);
 }
 
-void get_filetype(char *filename, char *filetype) 
+void get_filetype(char *filename, char *filetype)
 {
-    if (strstr(filename, ".html"))
+    if (strstr(filename, ".html") || strstr(filename, ".htm"))
         strcpy(filetype, "text/html");
+    else if (strstr(filename, ".css"))
+        strcpy(filetype, "text/css");
+    else if (strstr(filename, ".js"))
+        strcpy(filetype, "application/javascript");
+    else if (strstr(filename, ".json"))
+        strcpy(filetype, "application/json");
+    else if (strstr(filename, ".xml"))
+        strcpy(filetype, "application/xml");
     else if (strstr(filename, ".gif"))
         strcpy(filetype, "image/gif");
     else if (strstr(filename, ".jpg") || strstr(filename, ".jpeg") || strstr(filename, ".jpe"))
         strcpy(filetype, "image/jpeg");
     else if (strstr(filename, ".png"))
         strcpy(filetype, "image/png");
+    else if (strstr(filename, ".webp"))
+        strcpy(filetype, "image/webp");
+    else if (strstr(filename, ".svg"))
+        strcpy(filetype, "image/svg+xml");
+    else if (strstr(filename, ".ico"))
+        strcpy(filetype, "image/x-icon");
+    else if (strstr(filename, ".mp4"))
+        strcpy(filetype, "video/mp4");
+    else if (strstr(filename, ".webm"))
+        strcpy(filetype, "video/webm");
     else if (strstr(filename, ".mpg") || strstr(filename, ".mpeg") || strstr(filename, ".mpe"))
         strcpy(filetype, "video/mpeg");
+    else if (strstr(filename, ".mp3"))
+        strcpy(filetype, "audio/mpeg");
+    else if (strstr(filename, ".wav"))
+        strcpy(filetype, "audio/wav");
+    else if (strstr(filename, ".woff2"))
+        strcpy(filetype, "font/woff2");
+    else if (strstr(filename, ".woff"))
+        strcpy(filetype, "font/woff");
+    else if (strstr(filename, ".ttf"))
+        strcpy(filetype, "font/ttf");
+    else if (strstr(filename, ".pdf"))
+        strcpy(filetype, "application/pdf");
     else
-        strcpy(filetype, "text/plain");
+        strcpy(filetype, "application/octet-stream");
 }
 
 void serve_dynamic(int fd, char *filename, char *cgiargs) 

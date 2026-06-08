@@ -129,101 +129,101 @@ TinyWeb/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/build
 .PHONY : TinyWeb/fast
 
-csapp.o: csapp.c.o
-.PHONY : csapp.o
+src/csapp.o: src/csapp.c.o
+.PHONY : src/csapp.o
 
 # target to build an object file
-csapp.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/csapp.c.o
-.PHONY : csapp.c.o
+src/csapp.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/csapp.c.o
+.PHONY : src/csapp.c.o
 
-csapp.i: csapp.c.i
-.PHONY : csapp.i
+src/csapp.i: src/csapp.c.i
+.PHONY : src/csapp.i
 
 # target to preprocess a source file
-csapp.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/csapp.c.i
-.PHONY : csapp.c.i
+src/csapp.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/csapp.c.i
+.PHONY : src/csapp.c.i
 
-csapp.s: csapp.c.s
-.PHONY : csapp.s
+src/csapp.s: src/csapp.c.s
+.PHONY : src/csapp.s
 
 # target to generate assembly for a file
-csapp.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/csapp.c.s
-.PHONY : csapp.c.s
+src/csapp.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/csapp.c.s
+.PHONY : src/csapp.c.s
 
-main.o: main.c.o
-.PHONY : main.o
+src/main.o: src/main.c.o
+.PHONY : src/main.o
 
 # target to build an object file
-main.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/main.c.o
-.PHONY : main.c.o
+src/main.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/main.c.o
+.PHONY : src/main.c.o
 
-main.i: main.c.i
-.PHONY : main.i
+src/main.i: src/main.c.i
+.PHONY : src/main.i
 
 # target to preprocess a source file
-main.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/main.c.i
-.PHONY : main.c.i
+src/main.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/main.c.i
+.PHONY : src/main.c.i
 
-main.s: main.c.s
-.PHONY : main.s
+src/main.s: src/main.c.s
+.PHONY : src/main.s
 
 # target to generate assembly for a file
-main.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/main.c.s
-.PHONY : main.c.s
+src/main.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/main.c.s
+.PHONY : src/main.c.s
 
-sbuf.o: sbuf.c.o
-.PHONY : sbuf.o
+src/sbuf.o: src/sbuf.c.o
+.PHONY : src/sbuf.o
 
 # target to build an object file
-sbuf.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sbuf.c.o
-.PHONY : sbuf.c.o
+src/sbuf.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sbuf.c.o
+.PHONY : src/sbuf.c.o
 
-sbuf.i: sbuf.c.i
-.PHONY : sbuf.i
+src/sbuf.i: src/sbuf.c.i
+.PHONY : src/sbuf.i
 
 # target to preprocess a source file
-sbuf.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sbuf.c.i
-.PHONY : sbuf.c.i
+src/sbuf.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sbuf.c.i
+.PHONY : src/sbuf.c.i
 
-sbuf.s: sbuf.c.s
-.PHONY : sbuf.s
+src/sbuf.s: src/sbuf.c.s
+.PHONY : src/sbuf.s
 
 # target to generate assembly for a file
-sbuf.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sbuf.c.s
-.PHONY : sbuf.c.s
+src/sbuf.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sbuf.c.s
+.PHONY : src/sbuf.c.s
 
-sio.o: sio.c.o
-.PHONY : sio.o
+src/sio.o: src/sio.c.o
+.PHONY : src/sio.o
 
 # target to build an object file
-sio.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sio.c.o
-.PHONY : sio.c.o
+src/sio.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sio.c.o
+.PHONY : src/sio.c.o
 
-sio.i: sio.c.i
-.PHONY : sio.i
+src/sio.i: src/sio.c.i
+.PHONY : src/sio.i
 
 # target to preprocess a source file
-sio.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sio.c.i
-.PHONY : sio.c.i
+src/sio.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sio.c.i
+.PHONY : src/sio.c.i
 
-sio.s: sio.c.s
-.PHONY : sio.s
+src/sio.s: src/sio.c.s
+.PHONY : src/sio.s
 
 # target to generate assembly for a file
-sio.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/sio.c.s
-.PHONY : sio.c.s
+src/sio.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/TinyWeb.dir/build.make CMakeFiles/TinyWeb.dir/src/sio.c.s
+.PHONY : src/sio.c.s
 
 # Help Target
 help:
@@ -234,18 +234,18 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... TinyWeb"
-	@echo "... csapp.o"
-	@echo "... csapp.i"
-	@echo "... csapp.s"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
-	@echo "... sbuf.o"
-	@echo "... sbuf.i"
-	@echo "... sbuf.s"
-	@echo "... sio.o"
-	@echo "... sio.i"
-	@echo "... sio.s"
+	@echo "... src/csapp.o"
+	@echo "... src/csapp.i"
+	@echo "... src/csapp.s"
+	@echo "... src/main.o"
+	@echo "... src/main.i"
+	@echo "... src/main.s"
+	@echo "... src/sbuf.o"
+	@echo "... src/sbuf.i"
+	@echo "... src/sbuf.s"
+	@echo "... src/sio.o"
+	@echo "... src/sio.i"
+	@echo "... src/sio.s"
 .PHONY : help
 
 
