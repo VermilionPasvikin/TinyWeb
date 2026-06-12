@@ -15,12 +15,14 @@ sem_t terminal_mutex;
 #endif
 
 void doit(int fd);
-void read_requesthdrs(rio_t *rp);
+void read_requesthdrs(rio_t *rp, long *content_length, char *content_type);
 int parse_uri(char *uri, char *filename, char *cgiargs);
-void serve_static(int fd, char *filename, int filesize);
+void serve_static(int fd, char *filename, off_t filesize, int http11, int is_head);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs);
-void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
+void serve_dynamic(int fd, char *filename, char *cgiargs,
+                   const char *method, long content_length,
+                   const char *content_type, int http11);
+void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, int http11);
 void *thread_worker(void *vargp);
 void sigpipe_handler(int sig);
 void sigchld_handler(int sig);
@@ -51,34 +53,16 @@ void sigchld_handler(int sig)
     sigset_t mask, prev_mask;
     pid_t pid;
     sigfillset(&mask);
+    sigprocmask(SIG_BLOCK, &mask, &prev_mask);
 
-    while (1)
+    while ((pid = waitpid(-1, NULL, WNOHANG)) > 0)
     {
-        pid = waitpid(-1, NULL, WNOHANG);
-        sigprocmask(SIG_BLOCK, &mask, &prev_mask);
-        if (pid > 0)
-        {
-            sio_puts("Reaped a childprocess, pid: ");
-            sio_putl(pid);
-            sio_puts(".\n\n");
-        }
-        else if (pid < 0)
-        {
-            if (errno == EINTR)
-                continue;
-            else if(errno == ECHILD)
-                break;
-            else
-            {
-                sio_error("waitpid_error, errno: ");
-                sio_putl(errno);
-                sio_error(".\n\n");
-                break;
-            }
-        }
-        sigprocmask(SIG_SETMASK, &prev_mask, NULL);
+        sio_puts("Reaped a childprocess, pid: ");
+        sio_putl(pid);
+        sio_puts(".\n\n");
     }
-    
+
+    sigprocmask(SIG_SETMASK, &prev_mask, NULL);
     errno = olderrno;
 }
 
@@ -175,7 +159,7 @@ int main(int argc, char **argv)
         atomic_fetch_add(&g_stats.active_connections, 1);
 
         P(&terminal_mutex);
-        //printf("Accepted connection from (%s, %s)\n", hostname, port_s);
+        printf("Accepted connection from (%s, %s)\n", hostname, port_s);
         V(&terminal_mutex);
 
         sbuf_insert(&sbuf,connfd);
@@ -195,16 +179,18 @@ void *thread_worker(void *vargp)
     }
 }
 
-void doit(int fd) 
+void doit(int fd)
 {
     int is_static;
     struct stat sbuf;
     char buf[MAXLINE] = {0}, method[MAXLINE], uri[MAXLINE], version[MAXLINE];
     char filename[MAXLINE], cgiargs[MAXLINE];
+    char content_type[MAXLINE];
+    long content_length = 0;
     rio_t rio;
 
     Rio_readinitb(&rio, fd);
-    if(Rio_readlineb(&rio, buf, MAXLINE) == 0)
+    if(Rio_readlineb(&rio, buf, MAXLINE) <= 0)
         return;
 
     P(&terminal_mutex);
@@ -212,7 +198,12 @@ void doit(int fd)
     printf("%s", buf);
     V(&terminal_mutex);
 
-    sscanf(buf, "%s %s %s", method, uri, version);
+    sscanf(buf, "%8191s %8191s %8191s", method, uri, version);
+
+    int http11 = (strncmp(version, "HTTP/1.1", 8) == 0);
+    int is_get  = (strcasecmp(method, "GET")  == 0);
+    int is_post = (strcasecmp(method, "POST") == 0);
+    int is_head = (strcasecmp(method, "HEAD") == 0);
 
     /* 管理界面路由：优先处理 /__admin 前缀 */
     if (strncmp(uri, "/__admin", 8) == 0) {
@@ -222,116 +213,142 @@ void doit(int fd)
         return;
     }
 
-    if (strcasecmp(method, "GET")) {
+    if (!is_get && !is_post && !is_head) {
         clienterror(fd, method, "501", "Not Implemented",
-                    "Tiny does not implement this method");
+                    "Tiny does not implement this method", http11);
         return;
     }
 
-    read_requesthdrs(&rio);
+    content_type[0] = '\0';
+    read_requesthdrs(&rio, &content_length, content_type);
 
     is_static = parse_uri(uri, filename, cgiargs);
     if(is_static == -1)
     {
-        clienterror(fd, filename, "400", "Bad Request", 
-                     "Illegal parameters in URI.");
+        clienterror(fd, filename, "400", "Bad Request",
+                     "Illegal parameters in URI.", http11);
         return;
     }
 
     if (stat(filename, &sbuf) < 0) {
         clienterror(fd, filename, "404", "Not found",
-                    "Tiny couldn't find this file");
+                    "Tiny couldn't find this file", http11);
         return;
     }
 
-    if (is_static) { 
+    if (is_static) {
+        if (!is_get && !is_head) {
+            clienterror(fd, method, "405", "Method Not Allowed",
+                        "Static files only support GET and HEAD", http11);
+            return;
+        }
         if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
             clienterror(fd, filename, "403", "Forbidden",
-                        "Tiny couldn't read the file");
+                        "Tiny couldn't read the file", http11);
             return;
         }
-        serve_static(fd, filename, sbuf.st_size);
+        serve_static(fd, filename, sbuf.st_size, http11, is_head);
     }
-    else { 
+    else {
         if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
             clienterror(fd, filename, "403", "Forbidden",
-                        "Tiny couldn't run the CGI program");
+                        "Tiny couldn't run the CGI program", http11);
             return;
         }
-        serve_dynamic(fd, filename, cgiargs);
+        serve_dynamic(fd, filename, cgiargs, method, content_length,
+                      content_type, http11);
     }
 }
 
-void read_requesthdrs(rio_t *rp) 
+void read_requesthdrs(rio_t *rp, long *content_length, char *content_type)
 {
     char buf[MAXLINE] = {0};
-    Rio_readlineb(rp, buf, MAXLINE);
-    while (strcmp(buf, "\r\n")) {
-        Rio_readlineb(rp, buf, MAXLINE);
+    ssize_t n;
+    while ((n = Rio_readlineb(rp, buf, MAXLINE)) > 0) {
+        if (strcmp(buf, "\r\n") == 0) break;
         P(&terminal_mutex);
         printf("%s", buf);
         fflush(stdout);
         V(&terminal_mutex);
+        if (strncasecmp(buf, "Content-Length:", 15) == 0)
+            *content_length = atol(buf + 15);
+        else if (strncasecmp(buf, "Content-Type:", 13) == 0)
+            sscanf(buf + 13, " %8191s", content_type);
     }
     return;
 }
 
-int parse_uri(char *uri, char *filename, char *cgiargs) 
+int parse_uri(char *uri, char *filename, char *cgiargs)
 {
     char *ptr;
 
-    // 检查是否包含目录遍历序列
     if (strstr(uri, "..") != NULL) {
-        return -1; // 拒绝请求
+        return -1;
     }
 
+    size_t root_len = strlen(g_root);
+    size_t uri_len  = strlen(uri);
+    /* 防止 g_root + uri + "index.html" 超出 MAXLINE */
+    if (root_len + uri_len + 12 >= MAXLINE)
+        return -1;
+
     if (!strstr(uri, "cgi-bin")) {
-        strcpy(cgiargs, "");
-        strcpy(filename, g_root);
-        strcat(filename, uri);
-        if (uri[strlen(uri)-1] == '/')
-            strcat(filename, "index.html");
+        cgiargs[0] = '\0';
+        snprintf(filename, MAXLINE, "%s%s", g_root, uri);
+        if (uri_len > 0 && uri[uri_len - 1] == '/')
+            strncat(filename, "index.html", MAXLINE - strlen(filename) - 1);
         return 1;
     }
     else {
-        ptr = index(uri, '?');
+        ptr = strchr(uri, '?');
         if (ptr) {
-            strcpy(cgiargs, ptr+1);
+            strncpy(cgiargs, ptr + 1, MAXLINE - 1);
+            cgiargs[MAXLINE - 1] = '\0';
             *ptr = '\0';
         }
         else
-            strcpy(cgiargs, "");
-        strcpy(filename, g_root);
-        strcat(filename, uri);
+            cgiargs[0] = '\0';
+        snprintf(filename, MAXLINE, "%s%s", g_root, uri);
         return 0;
     }
 }
 
-void serve_static(int fd, char *filename, int filesize) 
+void serve_static(int fd, char *filename, off_t filesize, int http11, int is_head)
 {
     int srcfd;
     char *srcp, filetype[MAXLINE], buf[MAXLINE];
+    int n = 0;
 
     get_filetype(filename, filetype);
 
-    sprintf(buf, "HTTP/1.0 200 OK\r\n");
-    sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
-    sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
-    sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
-    Rio_writen(fd, buf, strlen(buf));
+    n += snprintf(buf + n, MAXLINE - n, "%s 200 OK\r\n",
+                  http11 ? "HTTP/1.1" : "HTTP/1.0");
+    n += snprintf(buf + n, MAXLINE - n, "Server: Tiny Web Server\r\n");
+    n += snprintf(buf + n, MAXLINE - n, "Content-Length: %lld\r\n", (long long)filesize);
+    n += snprintf(buf + n, MAXLINE - n, "Content-Type: %s\r\n", filetype);
+    if (http11)
+        n += snprintf(buf + n, MAXLINE - n, "Connection: close\r\n");
+    n += snprintf(buf + n, MAXLINE - n, "\r\n");
+    Rio_writen(fd, buf, n);
+
+    if (is_head) {
+        atomic_fetch_add(&g_stats.bytes_sent, n);
+        return;
+    }
 
     srcfd = Open(filename, O_RDONLY, 0);
-    if (filesize < 1024 * 1024) { // 小文件使用直接read
+    if (filesize < 1024 * 1024) {
         char *filebuf = (char *)Malloc(filesize);
         Read(srcfd, filebuf, filesize);
+        Close(srcfd);
         Rio_writen(fd, filebuf, filesize);
         Free(filebuf);
-    } else { // 大文件使用mmap
+    } else {
         srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
+        Close(srcfd);
         Rio_writen(fd, srcp, filesize);
         Munmap(srcp, filesize);
     }
-    Close(srcfd);
     atomic_fetch_add(&g_stats.bytes_sent, filesize);
 }
 
@@ -381,43 +398,64 @@ void get_filetype(char *filename, char *filetype)
         strcpy(filetype, "application/octet-stream");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs)
+void serve_dynamic(int fd, char *filename, char *cgiargs,
+                   const char *method, long content_length,
+                   const char *content_type, int http11)
 {
     char buf[MAXLINE], *emptylist[] = { NULL };
+    char cl_str[32];
 
-    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    snprintf(buf, sizeof(buf), "%s 200 OK\r\n", http11 ? "HTTP/1.1" : "HTTP/1.0");
     Rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Server: Tiny Web Server\r\n");
+    snprintf(buf, sizeof(buf), "Server: Tiny Web Server\r\n");
     Rio_writen(fd, buf, strlen(buf));
+    if (http11) {
+        snprintf(buf, sizeof(buf), "Connection: close\r\n");
+        Rio_writen(fd, buf, strlen(buf));
+    }
 
     atomic_fetch_add(&g_stats.total_requests, 1);
     stats_update_window();
 
     if (Fork() == 0) {
-        setenv("QUERY_STRING", cgiargs, 1);
+        setenv("QUERY_STRING",   cgiargs,                1);
+        setenv("REQUEST_METHOD", method,                 1);
+        snprintf(cl_str, sizeof(cl_str), "%ld", content_length);
+        setenv("CONTENT_LENGTH", cl_str,                 1);
+        setenv("CONTENT_TYPE",   content_type[0] ? content_type : "application/octet-stream", 1);
         Dup2(fd, STDOUT_FILENO);
+        if (strcasecmp(method, "POST") == 0)
+            Dup2(fd, STDIN_FILENO);
         Execve(filename, emptylist, environ);
     }
 }
 
 void clienterror(int fd, char *cause, char *errnum,
-                 char *shortmsg, char *longmsg) 
+                 char *shortmsg, char *longmsg, int http11)
 {
     char buf[MAXLINE], body[MAXBUF];
+    int bn = 0;
 
-    sprintf(body, "<html><title>Tiny Error</title>");
-    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
-    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
-    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+    bn += snprintf(body + bn, MAXBUF - bn, "<html><title>Tiny Error</title>");
+    bn += snprintf(body + bn, MAXBUF - bn, "<body bgcolor=\"ffffff\">\r\n");
+    bn += snprintf(body + bn, MAXBUF - bn, "%s: %s\r\n", errnum, shortmsg);
+    bn += snprintf(body + bn, MAXBUF - bn, "<p>%s: %s\r\n", longmsg, cause);
+    bn += snprintf(body + bn, MAXBUF - bn, "<hr><em>The Tiny Web server</em>\r\n");
 
-    sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+    snprintf(buf, sizeof(buf), "%s %s %s\r\n",
+             http11 ? "HTTP/1.1" : "HTTP/1.0", errnum, shortmsg);
     Rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Content-type: text/html\r\n");
+    snprintf(buf, sizeof(buf), "Content-Type: text/html\r\n");
     Rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
+    snprintf(buf, sizeof(buf), "Content-Length: %d\r\n", bn);
     Rio_writen(fd, buf, strlen(buf));
-    Rio_writen(fd, body, strlen(body));
+    if (http11) {
+        snprintf(buf, sizeof(buf), "Connection: close\r\n");
+        Rio_writen(fd, buf, strlen(buf));
+    }
+    snprintf(buf, sizeof(buf), "\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, bn);
     atomic_fetch_add(&g_stats.total_errors, 1);
     atomic_fetch_add(&g_stats.total_requests, 1);
     stats_update_window();
