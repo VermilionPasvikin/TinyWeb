@@ -11,7 +11,16 @@ add_executable(TinyWeb
     ${SRC_DIR}/main.c
     ${SRC_DIR}/sbuf.c
     ${SRC_DIR}/sio.c
+    ${SRC_DIR}/admin.c
 )
+
+add_executable(TinyProxy
+    ${SRC_DIR}/csapp.c
+    ${SRC_DIR}/sbuf.c
+    ${SRC_DIR}/sio.c
+    ${SRC_DIR}/proxy.c
+)
+target_include_directories(TinyProxy PRIVATE ${SRC_DIR})
 
 target_include_directories(TinyWeb PRIVATE ${SRC_DIR})
 
