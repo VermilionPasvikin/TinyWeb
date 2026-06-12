@@ -1,6 +1,7 @@
 #include "csapp.h"
 #include "sio.h"
 #include "sbuf.h"
+#include "admin.h"
 #include <libgen.h>   /* dirname() */
 #define THREAD_COUNT 8
 #define SBUF_SIZE 32
@@ -152,6 +153,10 @@ int main(int argc, char **argv)
 
     printf("TinyWeb starting on port %d, serving from: %s\n", port_t, g_root);
 
+    /* 初始化统计数据 */
+    g_stats.start_time = time(NULL);
+    g_stats.last_window_time = g_stats.start_time;
+
     listenfd = Open_listenfd(port_t);
 
     sbuf_init(&sbuf, SBUF_SIZE);
@@ -167,8 +172,10 @@ int main(int argc, char **argv)
         Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE,
                     port_s, MAXLINE, 0);
 
+        atomic_fetch_add(&g_stats.active_connections, 1);
+
         P(&terminal_mutex);
-        printf("Accepted connection from (%s, %s)\n", hostname, port_s);
+        //printf("Accepted connection from (%s, %s)\n", hostname, port_s);
         V(&terminal_mutex);
 
         sbuf_insert(&sbuf,connfd);
@@ -183,7 +190,8 @@ void *thread_worker(void *vargp)
     {
         int connfd = sbuf_remove(&sbuf);
         doit(connfd);
-        Close(connfd); 
+        atomic_fetch_sub(&g_stats.active_connections, 1);
+        Close(connfd);
     }
 }
 
@@ -191,12 +199,13 @@ void doit(int fd)
 {
     int is_static;
     struct stat sbuf;
-    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    char buf[MAXLINE] = {0}, method[MAXLINE], uri[MAXLINE], version[MAXLINE];
     char filename[MAXLINE], cgiargs[MAXLINE];
     rio_t rio;
 
     Rio_readinitb(&rio, fd);
-    Rio_readlineb(&rio, buf, MAXLINE);
+    if(Rio_readlineb(&rio, buf, MAXLINE) == 0)
+        return;
 
     P(&terminal_mutex);
     printf("Request headers:\n");
@@ -204,14 +213,31 @@ void doit(int fd)
     V(&terminal_mutex);
 
     sscanf(buf, "%s %s %s", method, uri, version);
-    if (strcasecmp(method, "GET")) { 
+
+    /* 管理界面路由：优先处理 /__admin 前缀 */
+    if (strncmp(uri, "/__admin", 8) == 0) {
+        admin_handle(&rio, fd, method, uri);
+        atomic_fetch_add(&g_stats.total_requests, 1);
+        stats_update_window();
+        return;
+    }
+
+    if (strcasecmp(method, "GET")) {
         clienterror(fd, method, "501", "Not Implemented",
                     "Tiny does not implement this method");
         return;
     }
+
     read_requesthdrs(&rio);
 
     is_static = parse_uri(uri, filename, cgiargs);
+    if(is_static == -1)
+    {
+        clienterror(fd, filename, "400", "Bad Request", 
+                     "Illegal parameters in URI.");
+        return;
+    }
+
     if (stat(filename, &sbuf) < 0) {
         clienterror(fd, filename, "404", "Not found",
                     "Tiny couldn't find this file");
@@ -238,8 +264,7 @@ void doit(int fd)
 
 void read_requesthdrs(rio_t *rp) 
 {
-    char buf[MAXLINE];
-
+    char buf[MAXLINE] = {0};
     Rio_readlineb(rp, buf, MAXLINE);
     while (strcmp(buf, "\r\n")) {
         Rio_readlineb(rp, buf, MAXLINE);
@@ -307,6 +332,7 @@ void serve_static(int fd, char *filename, int filesize)
         Munmap(srcp, filesize);
     }
     Close(srcfd);
+    atomic_fetch_add(&g_stats.bytes_sent, filesize);
 }
 
 void get_filetype(char *filename, char *filetype)
@@ -355,7 +381,7 @@ void get_filetype(char *filename, char *filetype)
         strcpy(filetype, "application/octet-stream");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs) 
+void serve_dynamic(int fd, char *filename, char *cgiargs)
 {
     char buf[MAXLINE], *emptylist[] = { NULL };
 
@@ -364,10 +390,13 @@ void serve_dynamic(int fd, char *filename, char *cgiargs)
     sprintf(buf, "Server: Tiny Web Server\r\n");
     Rio_writen(fd, buf, strlen(buf));
 
-    if (Fork() == 0) { 
-        setenv("QUERY_STRING", cgiargs, 1); 
-        Dup2(fd, STDOUT_FILENO);         
-        Execve(filename, emptylist, environ); 
+    atomic_fetch_add(&g_stats.total_requests, 1);
+    stats_update_window();
+
+    if (Fork() == 0) {
+        setenv("QUERY_STRING", cgiargs, 1);
+        Dup2(fd, STDOUT_FILENO);
+        Execve(filename, emptylist, environ);
     }
 }
 
@@ -389,4 +418,7 @@ void clienterror(int fd, char *cause, char *errnum,
     sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, body, strlen(body));
+    atomic_fetch_add(&g_stats.total_errors, 1);
+    atomic_fetch_add(&g_stats.total_requests, 1);
+    stats_update_window();
 }

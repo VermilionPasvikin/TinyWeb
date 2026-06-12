@@ -691,6 +691,7 @@ void rio_readinitb(rio_t *rp, int fd)
     rp->rio_fd = fd;  
     rp->rio_cnt = 0;  
     rp->rio_bufptr = rp->rio_buf;
+    memset(rp->rio_buf, sizeof(char) * RIO_BUFSIZE, 0);
 }
 /* $end rio_readinitb */
 
