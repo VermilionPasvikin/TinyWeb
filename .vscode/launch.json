@@ -2,31 +2,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(lldb) 启动",
+            "name": "(lldb) 启动 TinyWeb",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/main",
-            "args": [
-                "80"
-            ],
+            "program": "${workspaceFolder}/build/TinyWeb",
+            "args": ["100"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
             "externalConsole": true,
             "MIMode": "lldb"
         },
+
         {
-            "name": "C/C++: clang 构建和调试活动文件",
+            "name": "(lldb) 启动 TinyProxy",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": [],
+            "program": "${workspaceFolder}/build/TinyProxy",
+            "args": [
+                "80", "localhost:100"
+            ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "preLaunchTask": "C/C++: clang 生成活动文件"
+            "externalConsole": true,
+            "MIMode": "lldb"
         }
     ]
 }
