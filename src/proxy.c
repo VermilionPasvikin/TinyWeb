@@ -54,11 +54,11 @@ static void relay_data(int client_fd, int server_fd) {
         FD_SET(server_fd, &fds);
 
         int ret = select(maxfd, &fds, NULL, NULL, &tv);
-        if (ret <= 0)
-        {
-            printf("chaoshi\n");
-            exit(1);
-        }; /* 超时或错误 */
+        if (ret == 0) break;          /* 超时：关闭连接 */
+        if (ret < 0) {
+            if (errno == EINTR) continue;  /* 信号中断：重试 */
+            break;                         /* 其他错误：关闭连接 */
+        }
 
         if (FD_ISSET(client_fd, &fds)) {
             ssize_t n = read(client_fd, buf, sizeof(buf));
@@ -115,7 +115,7 @@ static void forward_request(int client_fd, const char *client_ip) {
     }
     strncpy(first_line, buf, MAXLINE - 1);
     /* 提取 URI 用于日志 */
-    sscanf(buf, "%*s %s", uri_for_log);
+    sscanf(buf, "%*s %8191s", uri_for_log);
     Rio_writen(server_fd, buf, strlen(buf));
 
     /* 读并转发请求头 */
