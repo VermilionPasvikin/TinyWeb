@@ -15,6 +15,7 @@ sem_t terminal_mutex;
 #endif
 
 void doit(int fd);
+void admin_handle_standalone(int fd);
 void read_requesthdrs(rio_t *rp, long *content_length, char *content_type);
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void serve_static(int fd, char *filename, off_t filesize, int http11, int is_head);
@@ -70,7 +71,8 @@ int main(int argc, char **argv)
 {
     int listenfd, connfd;
     char hostname[MAXLINE], port_s[MAXLINE];
-    int port_t;
+    int port_t, admin_port = 0;
+    int adminfd = -1;
     pthread_t tid_arr[THREAD_COUNT];
     socklen_t clientlen;
     struct sockaddr_storage clientaddr;
@@ -110,9 +112,9 @@ int main(int argc, char **argv)
     Sem_init(&terminal_mutex, 0, 1);
 #endif
 
-    /* 解析命令行参数：TinyWeb <port> [--root <dir>] */
+    /* 解析命令行参数：TinyWeb <port> [--admin-port <port>] [--root <dir>] */
     if (argc < 2) {
-        fprintf(stderr, "usage: %s <port> [--root <dir>]\n", argv[0]);
+        fprintf(stderr, "usage: %s <port> [--admin-port <port>] [--root <dir>]\n", argv[0]);
         exit(1);
     }
 
@@ -121,27 +123,57 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    /* 解析 --root 参数，默认使用可执行文件所在目录下的 www/ */
+    /* 解析 --root 和 --admin-port 参数 */
     strcpy(g_root, "www");
-    for (int i = 2; i < argc - 1; i++) {
+    for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--root") == 0) {
+            if (i + 1 >= argc) { fprintf(stderr, "--root requires an argument\n"); exit(1); }
             strncpy(g_root, argv[i+1], MAXLINE - 1);
             g_root[MAXLINE - 1] = '\0';
-            /* 去掉末尾斜杠 */
             int rlen = strlen(g_root);
             if (rlen > 1 && g_root[rlen-1] == '/')
                 g_root[rlen-1] = '\0';
-            break;
+            i++;
+        } else if (strcmp(argv[i], "--admin-port") == 0) {
+            if (i + 1 >= argc) { fprintf(stderr, "--admin-port requires an argument\n"); exit(1); }
+            if (sscanf(argv[i+1], "%d", &admin_port) != 1 || admin_port <= 0) {
+                fprintf(stderr, "invalid admin port\n");
+                exit(1);
+            }
+            i++;
         }
     }
 
     printf("TinyWeb starting on port %d, serving from: %s\n", port_t, g_root);
+    if (admin_port > 0)
+        printf("Admin interface on 127.0.0.1:%d\n", admin_port);
 
     /* 初始化统计数据 */
     g_stats.start_time = time(NULL);
     g_stats.last_window_time = g_stats.start_time;
 
     listenfd = Open_listenfd(port_t);
+
+    /* 管理端口仅绑定 127.0.0.1 */
+    if (admin_port > 0) {
+        struct sockaddr_in adminaddr;
+        int optval = 1;
+        adminfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (adminfd < 0) { perror("admin socket"); exit(1); }
+        if (setsockopt(adminfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
+            perror("admin setsockopt"); exit(1);
+        }
+        memset(&adminaddr, 0, sizeof(adminaddr));
+        adminaddr.sin_family = AF_INET;
+        adminaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+        adminaddr.sin_port = htons((unsigned short)admin_port);
+        if (bind(adminfd, (SA *)&adminaddr, sizeof(adminaddr)) < 0) {
+            perror("admin bind"); exit(1);
+        }
+        if (listen(adminfd, LISTENQ) < 0) {
+            perror("admin listen"); exit(1);
+        }
+    }
 
     sbuf_init(&sbuf, SBUF_SIZE);
 
@@ -151,18 +183,39 @@ int main(int argc, char **argv)
     }
 
     while (1) {
-        clientlen = sizeof(clientaddr);
-        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
-        Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE,
-                    port_s, MAXLINE, 0);
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(listenfd, &readfds);
+        int maxfd = listenfd;
+        if (adminfd >= 0) {
+            FD_SET(adminfd, &readfds);
+            if (adminfd > maxfd) maxfd = adminfd;
+        }
 
-        atomic_fetch_add(&g_stats.active_connections, 1);
+        if (select(maxfd + 1, &readfds, NULL, NULL, NULL) < 0) {
+            if (errno == EINTR) continue;
+            perror("select");
+            break;
+        }
 
-        P(&terminal_mutex);
-        printf("Accepted connection from (%s, %s)\n", hostname, port_s);
-        V(&terminal_mutex);
+        if (FD_ISSET(listenfd, &readfds)) {
+            clientlen = sizeof(clientaddr);
+            connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
+            Getnameinfo((SA *)&clientaddr, clientlen, hostname, MAXLINE,
+                        port_s, MAXLINE, 0);
+            atomic_fetch_add(&g_stats.active_connections, 1);
+            P(&terminal_mutex);
+            printf("Accepted connection from (%s, %s)\n", hostname, port_s);
+            V(&terminal_mutex);
+            sbuf_insert(&sbuf, connfd);
+        }
 
-        sbuf_insert(&sbuf,connfd);
+        if (adminfd >= 0 && FD_ISSET(adminfd, &readfds)) {
+            clientlen = sizeof(clientaddr);
+            connfd = Accept(adminfd, (SA *)&clientaddr, &clientlen);
+            /* ~connfd 为负数，用于标识管理连接 */
+            sbuf_insert(&sbuf, ~connfd);
+        }
     }
     return 0;
 }
@@ -172,11 +225,33 @@ void *thread_worker(void *vargp)
     Pthread_detach(Pthread_self());
     while (1)
     {
-        int connfd = sbuf_remove(&sbuf);
-        doit(connfd);
-        atomic_fetch_sub(&g_stats.active_connections, 1);
+        int raw = sbuf_remove(&sbuf);
+        int is_admin = (raw < 0);
+        int connfd = is_admin ? ~raw : raw;
+        if (is_admin) {
+            admin_handle_standalone(connfd);
+        } else {
+            doit(connfd);
+            atomic_fetch_sub(&g_stats.active_connections, 1);
+        }
         Close(connfd);
     }
+}
+
+/* 管理端口专用入口：读请求行后交给 admin_handle() */
+void admin_handle_standalone(int fd)
+{
+    char buf[MAXLINE] = {0}, method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    rio_t rio;
+
+    Rio_readinitb(&rio, fd);
+    if (Rio_readlineb(&rio, buf, MAXLINE) <= 0)
+        return;
+
+    sscanf(buf, "%8191s %8191s %8191s", method, uri, version);
+    admin_handle(&rio, fd, method, uri);
+    atomic_fetch_add(&g_stats.total_requests, 1);
+    stats_update_window();
 }
 
 void doit(int fd)
@@ -204,14 +279,6 @@ void doit(int fd)
     int is_get  = (strcasecmp(method, "GET")  == 0);
     int is_post = (strcasecmp(method, "POST") == 0);
     int is_head = (strcasecmp(method, "HEAD") == 0);
-
-    /* 管理界面路由：优先处理 /__admin 前缀 */
-    if (strncmp(uri, "/__admin", 8) == 0) {
-        admin_handle(&rio, fd, method, uri);
-        atomic_fetch_add(&g_stats.total_requests, 1);
-        stats_update_window();
-        return;
-    }
 
     if (!is_get && !is_post && !is_head) {
         clienterror(fd, method, "501", "Not Implemented",
