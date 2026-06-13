@@ -42,18 +42,21 @@ TinyWeb
 TinyWeb 使用
 ------------
 
-  ./TinyWeb <端口> [--root <站点目录>]
+  ./TinyWeb <端口> [--admin-port <管理端口>] [--root <站点目录>]
 
   # 示例：在 8080 端口启动，使用默认 www/ 目录
   ./TinyWeb 8080
 
+  # 启用管理面板（仅本机可访问）
+  ./TinyWeb 8080 --admin-port 9090
+
   # 指定自定义站点目录
-  ./TinyWeb 8080 --root /var/www/html
+  ./TinyWeb 8080 --admin-port 9090 --root /var/www/html
 
 启动后访问：
-  http://localhost:8080/          静态文件
+  http://localhost:8080/               静态文件
   http://localhost:8080/cgi-bin/hello  CGI 动态内容
-  http://localhost:8080/__admin/  后台管理面板
+  http://localhost:9090/__admin/       后台管理面板（需传 --admin-port）
 
 支持的 HTTP 方法：GET、POST、HEAD
 支持协议：HTTP/1.0、HTTP/1.1（响应版本跟随请求版本，Connection: close）
@@ -62,10 +65,16 @@ TinyWeb 使用
 TinyProxy 使用
 --------------
 
-  ./TinyProxy <监听端口> <后端host:port> [后端host:port ...]
+  ./TinyProxy <监听端口> [--admin-port <管理端口>] <后端host:port> [后端host:port ...]
 
   # 示例：在 9090 端口监听，轮询转发到两个后端
   ./TinyProxy 9090 localhost:8080 localhost:8081
+
+  # 启用代理管理面板
+  ./TinyProxy 9090 --admin-port 9091 localhost:8080 localhost:8081
+
+  # --admin-port 可放在后端列表之前或之后
+  ./TinyProxy 9090 localhost:8080 --admin-port 9091
 
 特性：
   - 轮询（Round-Robin）负载均衡，最多 8 个后端
@@ -74,13 +83,29 @@ TinyProxy 使用
   - 双向 TCP 中继，select + 30 秒超时
 
 
-后台管理面板（/__admin）
-------------------------
+管理面板安全说明
+----------------
+
+管理面板通过独立端口提供，仅绑定 127.0.0.1（本机回环地址），
+无法从网络其他主机访问。不传 --admin-port 则管理接口完全不启动。
+
+TinyWeb 管理面板（--admin-port 指定的端口）：
 
   GET  /__admin/          管理页面（实时图表，2 秒刷新）
   GET  /__admin/status    JSON：连接数、总请求数、错误数、运行时长
   GET  /__admin/metrics   JSON：发送字节数、近 60 秒请求速率
   POST /__admin/stop      优雅停止服务器
+
+TinyProxy 管理面板（--admin-port 指定的端口）：
+
+  GET  /__admin/          管理页面（含后端状态表格，2 秒刷新）
+  GET  /__admin/status    JSON：连接数、总请求数、错误数、运行时长
+  GET  /__admin/metrics   JSON：转发字节数、近 60 秒请求速率
+  GET  /__admin/backends  JSON：各后端 host:port、存活状态、请求计数
+  POST /__admin/stop      优雅停止代理
+
+注意：TinyProxy 管理面板展示的是代理层自身的统计（经过代理转发的流量），
+与各后端实例的 /__admin 数据相互独立。多后端场景下各实例的统计需分别查看。
 
 
 CGI 开发

@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/TinyWeb",
-            "args": ["100"],
+            "args": ["100", "--admin-port", "9090"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
@@ -20,7 +20,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/TinyProxy",
             "args": [
-                "80", "localhost:100"
+                "80", "--admin-port", "9091", "localhost:100", "localhost:101", "localhost:102", "localhost:103"
             ],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
