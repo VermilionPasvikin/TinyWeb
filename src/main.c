@@ -20,7 +20,7 @@ void read_requesthdrs(rio_t *rp, long *content_length, char *content_type);
 int parse_uri(char *uri, char *filename, char *cgiargs);
 void serve_static(int fd, char *filename, off_t filesize, int http11, int is_head);
 void get_filetype(char *filename, char *filetype);
-void serve_dynamic(int fd, char *filename, char *cgiargs,
+void serve_dynamic(int fd, rio_t *rp, char *filename, char *cgiargs,
                    const char *method, long content_length,
                    const char *content_type, int http11);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, int http11);
@@ -322,7 +322,7 @@ void doit(int fd)
                         "Tiny couldn't run the CGI program", http11);
             return;
         }
-        serve_dynamic(fd, filename, cgiargs, method, content_length,
+        serve_dynamic(fd, &rio, filename, cgiargs, method, content_length,
                       content_type, http11);
     }
 }
@@ -465,12 +465,15 @@ void get_filetype(char *filename, char *filetype)
         strcpy(filetype, "application/octet-stream");
 }
 
-void serve_dynamic(int fd, char *filename, char *cgiargs,
+void serve_dynamic(int fd, rio_t *rp, char *filename, char *cgiargs,
                    const char *method, long content_length,
                    const char *content_type, int http11)
 {
     char buf[MAXLINE], *emptylist[] = { NULL };
     char cl_str[32];
+    int pipefd[2];
+    char *post_data = NULL;
+    int is_post = (strcasecmp(method, "POST") == 0);
 
     snprintf(buf, sizeof(buf), "%s 200 OK\r\n", http11 ? "HTTP/1.1" : "HTTP/1.0");
     Rio_writen(fd, buf, strlen(buf));
@@ -481,19 +484,66 @@ void serve_dynamic(int fd, char *filename, char *cgiargs,
         Rio_writen(fd, buf, strlen(buf));
     }
 
+    // 如果是POST请求，读取请求体
+    if (is_post && content_length > 0) {
+        post_data = malloc(content_length);
+        if (post_data == NULL) {
+            perror("malloc for POST data");
+            return;
+        }
+
+        // 从socket读取POST数据
+        ssize_t nread = Rio_readnb(rp, post_data, content_length);
+        if (nread != content_length) {
+            P(&terminal_mutex);
+            fprintf(stderr, "Failed to read POST data: expected %ld, got %zd\n",
+                    content_length, nread);
+            V(&terminal_mutex);
+            free(post_data);
+            return;
+        }
+
+        // 创建pipe用于传递POST数据给子进程
+        if (pipe(pipefd) < 0) {
+            perror("pipe");
+            free(post_data);
+            return;
+        }
+    }
+
     atomic_fetch_add(&g_stats.total_requests, 1);
     stats_update_window();
 
     if (Fork() == 0) {
+        // 子进程
         setenv("QUERY_STRING",   cgiargs,                1);
         setenv("REQUEST_METHOD", method,                 1);
         snprintf(cl_str, sizeof(cl_str), "%ld", content_length);
         setenv("CONTENT_LENGTH", cl_str,                 1);
         setenv("CONTENT_TYPE",   content_type[0] ? content_type : "application/octet-stream", 1);
+
+        // stdout重定向到socket
         Dup2(fd, STDOUT_FILENO);
-        if (strcasecmp(method, "POST") == 0)
-            Dup2(fd, STDIN_FILENO);
+
+        // 如果是POST，stdin重定向到pipe读端
+        if (is_post && content_length > 0) {
+            Close(pipefd[1]);  // 关闭写端
+            Dup2(pipefd[0], STDIN_FILENO);
+            Close(pipefd[0]);
+        }
+
         Execve(filename, emptylist, environ);
+    }
+
+    // 父进程
+    if (is_post && content_length > 0) {
+        Close(pipefd[0]);  // 关闭读端
+
+        // 将POST数据写入pipe
+        Rio_writen(pipefd[1], post_data, content_length);
+        Close(pipefd[1]);  // 关闭写端，发送EOF给子进程
+
+        free(post_data);
     }
 }
 
