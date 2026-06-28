@@ -2,26 +2,82 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <title>TinyWeb 测试页面</title>
+  <title>TinyWeb 测试站点</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding: 2rem; line-height: 1.6; }
-    h1 { color: #2c3e50; }
-    a { color: #0366d6; }
-    pre { background:#f6f8fa; padding:0.5rem; border-radius:6px; }
-  </style>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <h1>欢迎使用 TinyWeb — 测试页面</h1>
-  <p>这是一个用于测试静态文件服务的简单 HTML 页面。</p>
+  <nav class="navbar">
+    <div class="container">
+      <h1>TinyWeb 测试站点</h1>
+      <ul>
+        <li><a href="/">首页</a></li>
+        <li><a href="/features.html">功能介绍</a></li>
+        <li><a href="/static-demo.html">静态演示</a></li>
+        <li><a href="/cgi-demo.html">CGI演示</a></li>
+      </ul>
+    </div>
+  </nav>
 
-  <p>当前时间：<span id="time"></span></p>
+  <div class="container">
+    <h1>欢迎使用 TinyWeb</h1>
+    <p>这是一个轻量级的多线程HTTP服务器测试站点，展示TinyWeb引擎和TinyProxy反向代理的各项功能。</p>
 
-  <script>
-    document.getElementById('time').textContent = new Date().toLocaleString();
-  </script>
+    <div class="stats">
+      <div class="stat-item">
+        <div class="stat-value" id="visit-count">0</div>
+        <div class="stat-label">页面访问次数</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value current-time"></div>
+        <div class="stat-label">当前时间</div>
+      </div>
+    </div>
 
-  <hr>
-  <p>可将此文件放在项目根目录下，服务器收到“/”请求时会返回此页面。</p>
+    <h2>快速导航</h2>
+    <div class="card-grid">
+      <div class="card">
+        <h3>📋 功能介绍</h3>
+        <p>了解TinyWeb和TinyProxy的完整功能列表，包括HTTP方法支持、CGI处理、负载均衡等特性。</p>
+        <a href="/features.html" class="btn btn-primary">查看功能</a>
+      </div>
+
+      <div class="card">
+        <h3>🎨 静态内容演示</h3>
+        <p>展示HTML、CSS、JavaScript的渲染能力，包括动画、布局、本地存储等前端特性。</p>
+        <a href="/static-demo.html" class="btn btn-primary">查看演示</a>
+      </div>
+
+      <div class="card">
+        <h3>⚙️ CGI交互演示</h3>
+        <p>测试动态内容生成和POST请求处理能力，通过CGI程序展示服务器端处理和环境变量访问。</p>
+        <a href="/cgi-demo.html" class="btn btn-primary">测试CGI</a>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 3rem;">
+      <h3>关于项目</h3>
+      <p><strong>TinyWeb</strong> 是一个基于CSAPP教材的轻量级HTTP服务器，具有以下特点：</p>
+      <ul class="feature-list">
+        <li>多线程架构（8个工作线程）</li>
+        <li>支持静态文件和CGI动态内容</li>
+        <li>HTTP/1.0 和 HTTP/1.1 协议支持</li>
+        <li>可选的管理面板（/__admin/）</li>
+      </ul>
+      <p><strong>TinyProxy</strong> 是配套的反向代理服务器，提供：</p>
+      <ul class="feature-list">
+        <li>轮询负载均衡（最多8个后端）</li>
+        <li>自动健康检查（每3秒）</li>
+        <li>故障自动转移和恢复</li>
+        <li>X-Forwarded-For头注入</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <p>TinyWeb - 轻量级HTTP服务器 | 当前时间: <span class="current-time"></span></p>
+  </footer>
+
+  <script src="/app.js"></script>
 </body>
 </html>

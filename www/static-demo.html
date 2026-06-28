@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>静态内容演示 - TinyWeb</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1>TinyWeb 测试站点</h1>
+      <ul>
+        <li><a href="/">首页</a></li>
+        <li><a href="/features.html">功能介绍</a></li>
+        <li><a href="/static-demo.html">静态演示</a></li>
+        <li><a href="/cgi-demo.html">CGI演示</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>静态内容演示</h1>
+    <p>展示TinyWeb服务器的静态资源渲染能力，包括HTML、CSS和JavaScript的各种特性。</p>
+
+    <div class="demo-section">
+      <div class="card">
+        <h2>CSS 动画演示</h2>
+        <p>使用CSS关键帧动画实现的脉冲效果：</p>
+        <div style="text-align: center; padding: 2rem;">
+          <div class="animation-demo"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>CSS Grid 布局</h2>
+        <p>响应式网格布局演示：</p>
+        <div class="grid-demo">
+          <div class="grid-item">1</div>
+          <div class="grid-item">2</div>
+          <div class="grid-item">3</div>
+          <div class="grid-item">4</div>
+          <div class="grid-item">5</div>
+          <div class="grid-item">6</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>JavaScript 交互</h2>
+        <p>点击按钮测试JavaScript事件处理：</p>
+        <div class="demo-controls">
+          <button class="btn btn-primary" onclick="showAlert()">显示提示</button>
+          <button class="btn" onclick="changeColor()">改变颜色</button>
+          <button class="btn" onclick="incrementCounter()">计数器: <span id="counter">0</span></button>
+        </div>
+        <div id="color-box" style="width: 100%; height: 100px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 6px; margin-top: 1rem; transition: all 0.3s;"></div>
+      </div>
+
+      <div class="card">
+        <h2>本地存储演示</h2>
+        <p>使用localStorage保存和读取数据：</p>
+        <input type="text" id="storage-input" placeholder="输入一些文本...">
+        <div class="demo-controls">
+          <button class="btn btn-primary" onclick="saveToStorage()">保存到本地存储</button>
+          <button class="btn" onclick="loadFromStorage()">从本地存储读取</button>
+          <button class="btn" onclick="clearStorage()">清除存储</button>
+        </div>
+        <div class="response-box" id="storage-result">还未保存任何数据</div>
+      </div>
+
+      <div class="card">
+        <h2>实时时钟</h2>
+        <p>JavaScript定时器实现的实时时钟：</p>
+        <div style="text-align: center;">
+          <div style="font-size: 3rem; font-weight: bold; color: var(--primary);" id="clock">00:00:00</div>
+          <div style="font-size: 1.2rem; color: #666;" id="date">2024-01-01</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>SVG 图形</h2>
+        <p>内联SVG图形渲染：</p>
+        <div style="text-align: center; padding: 2rem;">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="80" fill="none" stroke="#0366d6" stroke-width="4"/>
+            <circle cx="100" cy="100" r="60" fill="none" stroke="#2c3e50" stroke-width="4"/>
+            <circle cx="100" cy="100" r="40" fill="none" stroke="#0366d6" stroke-width="4"/>
+            <circle cx="100" cy="100" r="20" fill="#0366d6"/>
+            <text x="100" y="105" text-anchor="middle" fill="white" font-size="12" font-weight="bold">SVG</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>CSS 渐变效果</h2>
+        <p>各种CSS渐变示例：</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
+          <div style="height: 100px; background: linear-gradient(to right, #f093fb 0%, #f5576c 100%); border-radius: 6px;"></div>
+          <div style="height: 100px; background: linear-gradient(to right, #4facfe 0%, #00f2fe 100%); border-radius: 6px;"></div>
+          <div style="height: 100px; background: linear-gradient(to right, #43e97b 0%, #38f9d7 100%); border-radius: 6px;"></div>
+          <div style="height: 100px; background: linear-gradient(to right, #fa709a 0%, #fee140 100%); border-radius: 6px;"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>DOM 操作演示</h2>
+        <p>动态创建和修改HTML元素：</p>
+        <button class="btn btn-primary" onclick="addListItem()">添加列表项</button>
+        <button class="btn" onclick="clearList()">清空列表</button>
+        <ul id="dynamic-list" style="margin-top: 1rem; list-style: disc; padding-left: 2rem;">
+          <li>初始列表项</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>TinyWeb - 轻量级HTTP服务器 | <a href="/">返回首页</a></p>
+  </footer>
+
+  <script src="/app.js"></script>
+  <script>
+    let counter = 0;
+    const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a', '#764ba2'];
+    let colorIndex = 0;
+
+    function showAlert() {
+      alert('这是一个JavaScript提示框！TinyWeb成功加载并执行了JavaScript代码。');
+    }
+
+    function changeColor() {
+      colorIndex = (colorIndex + 1) % colors.length;
+      const box = document.getElementById('color-box');
+      box.style.background = colors[colorIndex];
+    }
+
+    function incrementCounter() {
+      counter++;
+      document.getElementById('counter').textContent = counter;
+    }
+
+    function saveToStorage() {
+      const input = document.getElementById('storage-input');
+      const value = input.value;
+      if (value) {
+        localStorage.setItem('demoData', value);
+        document.getElementById('storage-result').innerHTML =
+          '<strong>已保存:</strong> ' + escapeHtml(value);
+        document.getElementById('storage-result').className = 'response-box success';
+      } else {
+        alert('请先输入一些文本');
+      }
+    }
+
+    function loadFromStorage() {
+      const value = localStorage.getItem('demoData');
+      if (value) {
+        document.getElementById('storage-input').value = value;
+        document.getElementById('storage-result').innerHTML =
+          '<strong>已读取:</strong> ' + escapeHtml(value);
+        document.getElementById('storage-result').className = 'response-box success';
+      } else {
+        document.getElementById('storage-result').innerHTML = '本地存储中没有数据';
+        document.getElementById('storage-result').className = 'response-box';
+      }
+    }
+
+    function clearStorage() {
+      localStorage.removeItem('demoData');
+      document.getElementById('storage-input').value = '';
+      document.getElementById('storage-result').innerHTML = '存储已清除';
+      document.getElementById('storage-result').className = 'response-box';
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+      document.getElementById('date').textContent =
+        `${year}-${month}-${day} ${weekdays[now.getDay()]}`;
+    }
+
+    function addListItem() {
+      const list = document.getElementById('dynamic-list');
+      const item = document.createElement('li');
+      item.textContent = `动态添加的项目 #${list.children.length}`;
+      list.appendChild(item);
+    }
+
+    function clearList() {
+      const list = document.getElementById('dynamic-list');
+      list.innerHTML = '<li>列表已清空，点击"添加列表项"开始</li>';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>CGI交互演示 - TinyWeb</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <h1>TinyWeb 测试站点</h1>
+      <ul>
+        <li><a href="/">首页</a></li>
+        <li><a href="/features.html">功能介绍</a></li>
+        <li><a href="/static-demo.html">静态演示</a></li>
+        <li><a href="/cgi-demo.html">CGI演示</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>CGI 交互演示</h1>
+    <p>测试TinyWeb的CGI动态内容生成能力。点击下方按钮调用不同的CGI程序。</p>
+
+    <div class="card">
+      <h2>可用的 CGI 程序</h2>
+
+      <div class="demo-section">
+        <h3>1. Hello CGI（基础示例）</h3>
+        <p>最简单的CGI程序，展示服务器时间和随机数。</p>
+        <div class="demo-controls">
+          <button class="btn btn-primary" onclick="callCGI('/cgi-bin/hello', 'hello-result')">调用 /cgi-bin/hello</button>
+          <button class="btn" onclick="callCGI('/cgi-bin/hello?name=访客', 'hello-result')">带参数调用</button>
+        </div>
+        <div class="response-box" id="hello-result">点击按钮查看结果</div>
+      </div>
+
+      <div class="demo-section">
+        <h3>2. Info CGI（环境信息）</h3>
+        <p>显示服务器环境变量和CGI运行环境信息。</p>
+        <div class="demo-controls">
+          <button class="btn btn-primary" onclick="callCGI('/cgi-bin/info', 'info-result')">调用 /cgi-bin/info</button>
+          <button class="btn" onclick="callCGI('/cgi-bin/info?debug=1&test=value', 'info-result')">带查询字符串</button>
+        </div>
+        <div class="response-box" id="info-result">点击按钮查看结果</div>
+      </div>
+
+      <div class="demo-section">
+        <h3>3. Echo CGI（回显测试）</h3>
+        <p>回显请求信息，支持GET和POST方法。</p>
+        <div class="demo-controls">
+          <button class="btn btn-primary" onclick="callCGI('/cgi-bin/echo?message=Hello+World', 'echo-result')">GET 请求</button>
+          <button class="btn" onclick="callEchoPOST()">POST 请求</button>
+        </div>
+        <div class="response-box" id="echo-result">点击按钮查看结果</div>
+      </div>
+
+      <div class="demo-section">
+        <h3>4. 计算器 CGI（POST演示）</h3>
+        <p>通过POST请求测试四则运算，展示表单提交和JSON响应处理。</p>
+
+        <form id="calc-form" onsubmit="handleCalc(event)" style="background:none; padding:0; border:none;">
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <input type="number" name="num1" placeholder="第一个数字" required step="any" style="width:120px; margin-bottom:0;">
+            <select name="operation" style="width:100px; margin-bottom:0;">
+              <option value="add">加法 (+)</option>
+              <option value="subtract">减法 (-)</option>
+              <option value="multiply">乘法 (×)</option>
+              <option value="divide">除法 (÷)</option>
+            </select>
+            <input type="number" name="num2" placeholder="第二个数字" required step="any" style="width:120px; margin-bottom:0;">
+            <button type="submit" class="btn btn-primary" style="margin-bottom:0;">计算</button>
+          </div>
+        </form>
+
+        <div class="response-box" id="calc-result" style="margin-top:1rem;">点击计算按钮查看结果</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>CGI 工作原理</h2>
+      <p>当你点击上面的按钮时，浏览器向TinyWeb服务器发送HTTP请求。服务器识别到这是一个CGI请求（路径包含/cgi-bin/），会执行以下步骤：</p>
+      <ol style="padding-left: 2rem;">
+        <li>Fork一个子进程</li>
+        <li>设置环境变量（REQUEST_METHOD, QUERY_STRING等）</li>
+        <li>将请求体重定向到子进程的stdin（对于POST请求）</li>
+        <li>将子进程的stdout重定向到客户端socket</li>
+        <li>执行CGI程序</li>
+        <li>CGI程序输出HTTP响应头和内容</li>
+        <li>响应返回到浏览器</li>
+      </ol>
+
+      <h3>环境变量示例</h3>
+      <pre>REQUEST_METHOD=GET
+QUERY_STRING=name=value&test=123
+CONTENT_LENGTH=45
+CONTENT_TYPE=application/x-www-form-urlencoded</pre>
+    </div>
+  </div>
+
+  <footer>
+    <p>TinyWeb - 轻量级HTTP服务器 | <a href="/">返回首页</a></p>
+  </footer>
+
+  <script src="/app.js"></script>
+  <script>
+    async function callCGI(url, resultId) {
+      const resultElement = document.getElementById(resultId);
+      resultElement.innerHTML = '正在请求...';
+      resultElement.className = 'response-box';
+
+      try {
+        const response = await fetch(url);
+        const contentType = response.headers.get('content-type') || '';
+        const text = await response.text();
+
+        if (response.ok) {
+          if (contentType.includes('text/html')) {
+            // HTML响应：使用iframe渲染
+            resultElement.innerHTML = '<iframe srcdoc="' +
+              text.replace(/"/g, '&quot;') +
+              '" style="width:100%; min-height:400px; border:1px solid #ddd; border-radius:4px;"></iframe>';
+          } else {
+            // JSON或其他：显示为格式化文本
+            resultElement.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+          }
+          resultElement.className = 'response-box success';
+        } else {
+          resultElement.innerHTML = '<strong>错误 ' + response.status + ':</strong> ' + escapeHtml(text);
+          resultElement.className = 'response-box error';
+        }
+      } catch (error) {
+        resultElement.innerHTML = '<strong>请求失败:</strong> ' + escapeHtml(error.message);
+        resultElement.className = 'response-box error';
+      }
+    }
+
+    async function callEchoPOST() {
+      const resultElement = document.getElementById('echo-result');
+      resultElement.innerHTML = '正在发送POST请求...';
+      resultElement.className = 'response-box';
+
+      try {
+        const response = await fetch('/cgi-bin/echo', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'message=这是一条POST消息&timestamp=' + Date.now()
+        });
+
+        const text = await response.text();
+
+        if (response.ok) {
+          resultElement.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+          resultElement.className = 'response-box success';
+        } else {
+          resultElement.innerHTML = '<strong>错误:</strong> ' + escapeHtml(text);
+          resultElement.className = 'response-box error';
+        }
+      } catch (error) {
+        resultElement.innerHTML = '<strong>请求失败:</strong> ' + escapeHtml(error.message);
+        resultElement.className = 'response-box error';
+      }
+    }
+
+    async function handleCalc(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      const params = new URLSearchParams(formData);
+      const resultElement = document.getElementById('calc-result');
+
+      resultElement.innerHTML = '正在计算...';
+      resultElement.className = 'response-box';
+
+      try {
+        const response = await fetch('/cgi-bin/calc', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: params.toString()
+        });
+
+        const text = await response.text();
+
+        if (response.ok) {
+          try {
+            const data = JSON.parse(text);
+            if (data.status === 'success') {
+              const ops = {add: '+', subtract: '-', multiply: '×', divide: '÷'};
+              resultElement.innerHTML =
+                `<strong>结果:</strong> ${formData.get('num1')} ${ops[formData.get('operation')]} ` +
+                `${formData.get('num2')} = <strong style="color:var(--primary); font-size:1.2rem;">${data.result}</strong>`;
+              resultElement.className = 'response-box success';
+            } else {
+              resultElement.innerHTML = '<strong>错误:</strong> ' + escapeHtml(data.message);
+              resultElement.className = 'response-box error';
+            }
+          } catch (e) {
+            resultElement.innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+            resultElement.className = 'response-box success';
+          }
+        } else {
+          resultElement.innerHTML = '<strong>服务器错误</strong>';
+          resultElement.className = 'response-box error';
+        }
+      } catch (error) {
+        resultElement.innerHTML = '<strong>请求失败:</strong> ' + escapeHtml(error.message);
+        resultElement.className = 'response-box error';
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
